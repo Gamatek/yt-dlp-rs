@@ -16,5 +16,6 @@ pub struct Format {
     pub protocol: String,
     pub filesize: Option<u64>,
     pub url: String,
+    pub sig_cipher: Option<String>,
     pub note: String,
 }

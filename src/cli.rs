@@ -22,4 +22,8 @@ pub struct Cli {
     /// Path to cookies.txt file
     #[arg(long = "cookies")]
     pub cookies: Option<String>,
+
+    /// Print various debugging information
+    #[arg(short = 'v', long = "verbose")]
+    pub verbose: bool,
 }

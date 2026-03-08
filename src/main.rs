@@ -9,16 +9,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Parse command line arguments
     let cli = Cli::parse();
 
-    let mut ytdl = YoutubeDl::new();
+    if cli.verbose {
+        println!("[debug] Initializing YoutubeDl with verbose logging enabled");
+    }
+
+    let mut ytdl = YoutubeDl::new(cli.verbose);
 
     if let Some(cookie_path) = cli.cookies {
+        if cli.verbose {
+            println!("[debug] Using cookies from: {}", cookie_path);
+        }
         ytdl.set_cookies(&cookie_path);
     }
 
     if cli.list_formats {
         println!("[youtube] Extracting URL: {}", cli.url);
         println!("[youtube] {}: Downloading webpage", cli.url.split('/').last().unwrap_or(&cli.url));
-        println!("[info] Available formats for {}:", cli.url.split('/').last().unwrap_or(&cli.url));
         let formats = match ytdl.extract_info(&cli.url).await {
             Ok(f) => f,
             Err(e) => {
@@ -98,6 +104,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             });
         }
 
+        println!("[info] Available formats for {}:", cli.url.split('/').last().unwrap_or(&cli.url));
         let header = format!(
             "{} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {}",
             format!("{:width$}", "ID", width=max_id).yellow(),
@@ -152,9 +159,63 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             );
         }
     } else {
-        println!("Start downloading (simulation)...");
-        println!("Format selection logic applied: {}", cli.format);
-        // TODO: Parse the format selector string, then proceed to downloading
+        println!("[youtube] Extracting URL: {}", cli.url);
+        let formats = match ytdl.extract_info(&cli.url).await {
+            Ok(f) => f,
+            Err(e) => {
+                let err_msg = e.to_string();
+                if err_msg.starts_with("ERROR:") {
+                    let rest = err_msg["ERROR:".len()..].trim_start();
+                    eprintln!("{}: {}", "ERROR".red(), rest);
+                } else {
+                    eprintln!("{}: {}", "ERROR".red(), err_msg);
+                }
+                std::process::exit(1);
+            }
+        };
+
+        let format_sel = &cli.format;
+
+        let video_id = cli.url
+            .split("youtu.be/").nth(1)
+            .or_else(|| cli.url.split("v=").nth(1))
+            .unwrap_or("video")
+            .split(|c| c == '?' || c == '&' || c == '/')
+            .next()
+            .unwrap_or("video")
+            .to_string();
+
+        let selected = formats.into_iter().find(|f| f.format_id == format_sel.as_str());
+
+        let format = match selected {
+            Some(f) => f,
+            None => {
+                eprintln!("ERROR: [youtube] {}: Requested format is not available. Use --list-formats for a list of available formats", video_id);
+                std::process::exit(1);
+            }
+        };
+
+        if format.url.is_empty() {
+            eprintln!("ERROR: [youtube] {}: Requested format is not available. Use --list-formats for a list of available formats", video_id);
+            std::process::exit(1);
+        }
+
+        // Determine output filename
+        let title_slug = ytdl.title.as_deref().unwrap_or(&video_id)
+            .chars()
+            .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' || c == ' ' { c } else { '_' })
+            .collect::<String>();
+
+        let output_path = cli.output
+            .unwrap_or_else(|| format!("{} [{}].{}", title_slug, video_id, format.ext));
+
+        match ytdl.download_format(&format, &output_path).await {
+            Ok(_) => {},
+            Err(e) => {
+                eprintln!("{}: {}", "ERROR".red(), e);
+                std::process::exit(1);
+            }
+        }
     }
 
     Ok(())
