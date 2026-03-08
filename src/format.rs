@@ -1,0 +1,20 @@
+#[derive(Debug, Clone)]
+pub struct Format {
+    pub format_id: String,
+    pub ext: String,
+    pub width: Option<u64>,
+    pub height: Option<u64>,
+    pub resolution: String,
+    pub fps: Option<u64>,
+    pub ch: Option<u8>,
+    pub vcodec: String,
+    pub vbr: Option<f64>,
+    pub acodec: String,
+    pub abr: Option<f64>,
+    pub asr: Option<u64>,
+    pub tbr: Option<f64>,
+    pub protocol: String,
+    pub filesize: Option<u64>,
+    pub url: String,
+    pub note: String,
+}
